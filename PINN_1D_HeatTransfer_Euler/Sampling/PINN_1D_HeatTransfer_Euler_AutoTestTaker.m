@@ -23,10 +23,9 @@ clear all; clc; close all;
 alpha = 1.0;
 
 % Time
-dt = 0.001;
+dt = 0.01;
 time = 0.1; % time max
 epoch_time = floor(time/dt);
-time_step = 2; % graph changing every mod(i,time_step)==0
 
 % Grid 1D
 Nx = 41; % N-many elements in x vector
@@ -36,9 +35,9 @@ dx = x(2) - x(1);
 
 % Neural Network
 learning_rate = 0.001;
-epoch_learning = 4096;
-batch = 512;
-Nn = 16; % N-many neuron
+epoch_learning = 1024;
+batch = 128;
+Nn = 32; % N-many neuron
 % weightes and biases
 min = -2; max = 2; % boundary weights and biases
 w0 = min + rand(Nn,1)*(abs(min)+abs(max));
@@ -49,17 +48,19 @@ params = [w0;b0;w1;b1];
 % initial_params = params;
 
 % Initial values
-U = sin(pi*x); % consider "U" as current y and "y" as next y
+U0 = sin(pi*x); % consider "U" as current y and "y" as next y
 
-% History
-hUfd = zeros(epoch_time,Nx);
-hU = zeros(epoch_time,Nx);
 
+% Matrix list sample test initialization
+test_iterations = 10;
+list_tnn = zeros(test_iterations,1);
+list_tfd = zeros(test_iterations,1);
+list_Unn = zeros(test_iterations,Nx);
+list_Ufd = zeros(test_iterations,Nx);
 
 
 %% Other solutions
 % Numerical solution - Finite Difference Method
-Ufd = U;
 s = alpha*dt/dx^2;
 
 A = eye([Nx,Nx]);
@@ -73,59 +74,51 @@ for i = 2:Nx-1
     end
 end
 
-t0fd = tic; % stopwatch start
-for i = 1:epoch_time
-    Ufd = Ufd/A;
-    Ufd(1) = 0; Ufd(end) = 0; % boundary conditions
-    hUfd(i,:) = Ufd;
+for k = 1:test_iterations
+    Ufd = U0;
+    t0fd = tic; % stopwatch start
+    for i = 1:epoch_time
+        Ufd = Ufd/A;
+        Ufd(1) = 0; Ufd(end) = 0; % boundary conditions
+    end
+    tfd = toc(t0fd); % stopwatch end
+    list_Ufd(k,:) = Ufd;
+    list_tfd(k) = tfd;
 end
-tfd = toc(t0fd); % stopwatch end
 
 % Exact solution
 Ue = sin(pi.*x).*exp(1).^(-pi^2.*time);
 
 
 
+
 %% Neural Network training
-t0nn = tic; % stopwatch start
-for i = 1:epoch_time
-    disp(i)
-    for j = 1:epoch_learning
-        params = training(params,U,x,Nn,alpha,dt,batch,learning_rate);
+for k = 1:test_iterations
+    U = U0;
+    t0nn = tic; % stopwatch start
+    for i = 1:epoch_time
+        disp(k+"."+i);
+        for j = 1:epoch_learning
+            params = training(params,U,x,Nn,alpha,dt,batch,learning_rate);
+        end
+        [y,~,~] = predict(params,x,Nn);
+        U = y;
     end
-    [y,~,~] = predict(params,x,Nn);
-    U = y;
-    hU(i,:) = U;
-    if mod(i,time_step)==0
-        figure(gcf);plot(x,U);ylim([0 1]);
-    end
+    tnn = toc(t0nn); % stopwatch end
+    list_Unn(k,:) = U;
+    list_tnn(k) = tnn;
 end
-tnn = toc(t0nn); % stopwatch end
 
 
 
-%% Results and Visualisations
-% Visualisations
-% Final result
-figure(2); clf;
-plot(x,U,'r--o'); % Neural Network prediction
-hold on;
-plot(x,Ufd,'g--'); % Finite Difference solution
-plot(x,Ue,'k'); % Exact solution
-lh = legend('Neural Network Prediction','Finite Difference Solution','Exact Solution'); 
-title("Results") ; xlabel ("x"); ylabel ("y","Rotation",0);
-hold off;
-
-% History
-figure(3); tiledlayout(1,2);
-nexttile; surf(x,1:epoch_time,hU); shading interp; view(0,90); colorbar;
-title("Neural Network History"); xlabel ("x"); ylabel("iteration(s)");
-nexttile; surf(x,1:epoch_time,hUfd); shading interp; view(0,90); colorbar;
-title("Finite Differencec History"); xlabel ("x"); ylabel("iteration(s)");
-
+%% Results
 % Error
-error_nn = mean((U-Ue).^2);
-error_fd = mean((Ufd-Ue).^2);
+error_nn = mean((list_Unn-Ue).^2,'all');
+error_fd = mean((list_Ufd-Ue).^2,'all');
+
+% Time
+time_nn = mean(list_tnn);
+time_fd = mean(list_tfd);
 
 
 

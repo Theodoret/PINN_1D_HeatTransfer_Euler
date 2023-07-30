@@ -1,0 +1,2 @@
+File with name 1 - 18 is calculation results with program "PINN_1D_HeatTransfer_Euler_AutoTestTaker" based the same numbers in column "name" from excel file.
+File "Sample" is a single run result with program "PINN_1D_HeatTransfer_Euler" and hyperparameter column "16"
